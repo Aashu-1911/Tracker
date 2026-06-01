@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FiMessageSquare, FiSend, FiTrash2 } from "react-icons/fi";
-import { useAIContext } from "../context/AIContext";
+import useAppContext from "../hooks/useAppContext";
 import MarkdownContent from "./MarkdownContent";
 import ErrorState from "./ErrorState";
 
@@ -12,9 +12,12 @@ const promptExamples = [
 ];
 
 const AIChat = ({ contextTasks = [] }) => {
-  const { messages, chatLoading, chatError, sendMessage, clearMessages } = useAIContext();
+  const { aiChat, sendAIMessage, clearChat } = useAppContext();
   const [draft, setDraft] = useState("");
   const containerRef = useRef(null);
+  const messages = useMemo(() => aiChat.messages || [], [aiChat.messages]);
+  const chatLoading = aiChat.loading;
+  const chatError = aiChat.error;
 
   useEffect(() => {
     const node = containerRef.current;
@@ -31,7 +34,7 @@ const AIChat = ({ contextTasks = [] }) => {
     }
 
     setDraft("");
-    await sendMessage({ message: text, context: contextTasks });
+    await sendAIMessage({ message: text, context: contextTasks });
   };
 
   return (
@@ -41,7 +44,7 @@ const AIChat = ({ contextTasks = [] }) => {
           <h3>AI coach</h3>
           <p className="meta">Ask for analysis, planning help, or a boost.</p>
         </div>
-        <button className="button secondary" type="button" onClick={clearMessages}>
+        <button className="button secondary" type="button" onClick={clearChat}>
           <FiTrash2 />
           Clear
         </button>

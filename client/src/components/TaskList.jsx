@@ -20,6 +20,10 @@ const TaskList = ({
   onToggleComplete,
   onDelete,
   onUpdate,
+  showToolbar = true,
+  title = "Tasks",
+  subtitle = "Filter by what matters most right now.",
+  emptyMessage = "No tasks match these filters yet.",
 }) => {
   const [dateFilter, setDateFilter] = useState("today");
   const [customDate, setCustomDate] = useState(formatISODate(new Date()));
@@ -62,6 +66,10 @@ const TaskList = ({
   };
 
   const filteredTasks = useMemo(() => {
+    if (!showToolbar) {
+      return Array.isArray(tasks) ? tasks : [];
+    }
+
     let list = Array.isArray(tasks) ? tasks : [];
 
     if (statusFilter !== "all") {
@@ -104,87 +112,104 @@ const TaskList = ({
     filterDate,
     priorityFilter,
     sortBy,
+    showToolbar,
   ]);
 
   return (
     <div className={styles.toolbar}>
-      <div className={styles.controls}>
-        <div>
-          <h3>Tasks</h3>
-          <p className="page-subtitle">Filter by what matters most right now.</p>
-        </div>
-        <button className="button secondary" type="button" onClick={handleRefresh}>
-          Refresh
-        </button>
-      </div>
+      {showToolbar ? (
+        <>
+          <div className={styles.controls}>
+            <div>
+              <h3>{title}</h3>
+              <p className="page-subtitle">{subtitle}</p>
+            </div>
+            <button className="button secondary" type="button" onClick={handleRefresh}>
+              Refresh
+            </button>
+          </div>
 
-      <div className={styles.filters}>
-        <label className={styles.filterGroup}>
-          Date
-          <select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}>
-            <option value="today">Today</option>
-            <option value="tomorrow">Tomorrow</option>
-            <option value="custom">Pick a date</option>
-            <option value="all">All</option>
-          </select>
-        </label>
-        {dateFilter === "custom" ? (
-          <label className={styles.filterGroup}>
-            Selected date
-            <input
-              type="date"
-              value={customDate}
-              onChange={(event) => setCustomDate(event.target.value)}
-            />
-          </label>
-        ) : null}
-        <label className={styles.filterGroup}>
-          Status
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-            {statusOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={styles.filterGroup}>
-          Category
-          <select
-            value={categoryFilter}
-            onChange={(event) => setCategoryFilter(event.target.value)}
-          >
-            {categoryOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={styles.filterGroup}>
-          Priority
-          <select
-            value={priorityFilter}
-            onChange={(event) => setPriorityFilter(event.target.value)}
-          >
-            {priorityOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={`${styles.filterGroup} ${styles.sortSelect}`}>
-          Sort by
-          <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+          <div className={styles.filters}>
+            <label className={styles.filterGroup}>
+              Date
+              <select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}>
+                <option value="today">Today</option>
+                <option value="tomorrow">Tomorrow</option>
+                <option value="custom">Pick a date</option>
+                <option value="all">All</option>
+              </select>
+            </label>
+            {dateFilter === "custom" ? (
+              <label className={styles.filterGroup}>
+                Selected date
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={(event) => setCustomDate(event.target.value)}
+                />
+              </label>
+            ) : null}
+            <label className={styles.filterGroup}>
+              Status
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                {statusOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.filterGroup}>
+              Category
+              <select
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+              >
+                {categoryOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.filterGroup}>
+              Priority
+              <select
+                value={priorityFilter}
+                onChange={(event) => setPriorityFilter(event.target.value)}
+              >
+                {priorityOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={`${styles.filterGroup} ${styles.sortSelect}`}>
+              Sort by
+              <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                {sortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </>
+      ) : (
+        <div className={styles.controls}>
+          <div className={styles.filterGroup}>
+            <span>{title}</span>
+            <span className="page-subtitle">{subtitle}</span>
+          </div>
+          {onRefresh ? (
+            <button className="button secondary" type="button" onClick={() => onRefresh({})}>
+              Refresh
+            </button>
+          ) : null}
+        </div>
+      )}
 
       {error ? <div className={styles.error}>{error}</div> : null}
 
@@ -195,7 +220,7 @@ const TaskList = ({
           ))}
         </div>
       ) : error ? null : filteredTasks.length === 0 ? (
-        <div className={styles.empty}>No tasks match these filters yet.</div>
+        <div className={styles.empty}>{emptyMessage}</div>
       ) : (
         <div className={styles.list}>
           {filteredTasks.map((task) => (

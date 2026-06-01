@@ -68,6 +68,179 @@
   gap: 28px;
 }
 
+.app-shell--workspace {
+  padding: 24px clamp(16px, 3vw, 28px) 32px;
+  gap: 20px;
+}
+
+.workspace-header,
+.workspace-footer {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+}
+
+.workspace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 24px;
+  backdrop-filter: blur(14px);
+}
+
+.workspace-header__controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  align-items: center;
+}
+
+.date-control,
+.view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--border);
+}
+
+.date-control input {
+  margin-top: 0;
+  width: auto;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(280px, 340px);
+  gap: 20px;
+  align-items: start;
+}
+
+.workspace-sidebar,
+.workspace-ai {
+  display: grid;
+  gap: 16px;
+  align-self: start;
+  position: sticky;
+  top: 24px;
+}
+
+.workspace-main {
+  min-width: 0;
+}
+
+.workspace-nav {
+  display: grid;
+  gap: 10px;
+}
+
+.workspace-nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.workspace-nav__link.active,
+.workspace-nav__link:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.sidebar-card {
+  display: grid;
+  gap: 12px;
+}
+
+.quick-action-list {
+  display: grid;
+  gap: 10px;
+}
+
+.workspace-ai__toggle {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.week-strip-card {
+  display: grid;
+  gap: 14px;
+}
+
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.week-day-chip {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.84);
+  border-radius: 16px;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.week-day-chip--active {
+  background: rgba(42, 157, 143, 0.14);
+  border-color: rgba(42, 157, 143, 0.34);
+}
+
+.toast-stack {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  display: grid;
+  gap: 10px;
+}
+
+.toast {
+  border: 0;
+  min-width: 240px;
+  max-width: 340px;
+  text-align: left;
+  color: white;
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.toast--success {
+  background: #2a9d8f;
+}
+
+.toast--error {
+  background: #b44c35;
+}
+
+.toast--info {
+  background: #3d405b;
+}
+
+.workspace-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .page-title {
   font-family: var(--display);
   font-size: clamp(28px, 3vw, 40px);
@@ -213,6 +386,16 @@ form.card label {
 
 input,
 textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  margin-top: 6px;
+  font-family: inherit;
+  background: #fff;
+}
+
+select {
   width: 100%;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
@@ -678,6 +861,11 @@ textarea {
   color: #8a4b36;
 }
 
+.workspace-ai--collapsed .ai-chat-card,
+.workspace-ai--collapsed .sidebar-card:last-child {
+  display: none;
+}
+
 .spin {
   animation: spin 0.85s linear infinite;
 }
@@ -734,5 +922,35 @@ textarea {
 
   .chat-message {
     max-width: 100%;
+  }
+
+  .workspace-header,
+  .workspace-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-sidebar,
+  .workspace-ai {
+    position: static;
+  }
+
+  .week-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toast-stack {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .toast {
+    max-width: none;
+    min-width: 0;
   }
 }
