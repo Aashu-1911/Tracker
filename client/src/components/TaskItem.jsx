@@ -3,13 +3,14 @@ import {
   FiCheckCircle,
   FiEdit3,
   FiTrash2,
-  FiStar,
   FiArrowUpCircle,
   FiArrowDownCircle,
   FiMinusCircle,
 } from "react-icons/fi";
 import { formatShortDate } from "../utils/dateUtils";
 import styles from "./TaskItem.module.css";
+import TaskInsightBadge from "./TaskInsightBadge";
+import InsightModal from "./InsightModal";
 
 const priorityIconMap = {
   high: <FiArrowUpCircle />,
@@ -27,10 +28,11 @@ const getFormStateFromTask = (task) => ({
 
 const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete }) => {
   const [editing, setEditing] = useState(false);
-  const [showInsight, setShowInsight] = useState(false);
   const [formState, setFormState] = useState(() => getFormStateFromTask(task));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [localInsight, setLocalInsight] = useState(task.aiInsight || "");
+  const [insightModalOpen, setInsightModalOpen] = useState(false);
 
   const category = task.category || "other";
   const status = task.status || "pending";
@@ -93,6 +95,13 @@ const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete }) => {
   const handleCancelEditing = () => {
     setFormState(getFormStateFromTask(task));
     setEditing(false);
+  };
+
+  const handleInsightReady = (updatedTask, insightText) => {
+    const nextInsight = insightText || updatedTask?.aiInsight || "";
+    setLocalInsight(nextInsight);
+    setFormState((prev) => ({ ...prev, aiInsight: nextInsight }));
+    setInsightModalOpen(true);
   };
 
   return (
@@ -195,6 +204,10 @@ const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete }) => {
               <span>{task.priority || "medium"}</span>
             </div>
             <div className={styles.actions}>
+              <TaskInsightBadge
+                task={{ ...task, aiInsight: localInsight || task.aiInsight }}
+                onInsightReady={handleInsightReady}
+              />
               <button
                 className={styles.ghost}
                 type="button"
@@ -215,14 +228,13 @@ const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete }) => {
                 <FiTrash2 />
                 Delete
               </button>
-              {task.aiInsight ? (
+              {localInsight ? (
                 <button
                   className={styles.ghost}
                   type="button"
-                  onClick={() => setShowInsight((prev) => !prev)}
+                  onClick={() => setInsightModalOpen(true)}
                 >
-                  <FiStar />
-                  {showInsight ? "Hide insight" : "View insight"}
+                  View insight
                 </button>
               ) : null}
             </div>
@@ -230,10 +242,12 @@ const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete }) => {
           {error ? <div className={styles.error}>{error}</div> : null}
         </>
       )}
-
-      {showInsight && task.aiInsight ? (
-        <div className={styles.insight}>{task.aiInsight}</div>
-      ) : null}
+      <InsightModal
+        isOpen={insightModalOpen}
+        title={`Insight for ${task.title}`}
+        insight={localInsight || task.aiInsight}
+        onClose={() => setInsightModalOpen(false)}
+      />
     </article>
   );
 };

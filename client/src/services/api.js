@@ -30,5 +30,6 @@ export const updateProgress = (payload) =>
 export const generateAIInsights = (payload) =>
   api.post("/ai/generate-insights", payload).then(handleResponse);
 export const chatWithAI = (payload) => api.post("/ai/chat", payload).then(handleResponse);
+export const clearAIChat = () => api.post("/ai/chat/reset").then(handleResponse);
 
 export default api;

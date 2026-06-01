@@ -5,6 +5,7 @@ const {
   allowedCategories,
   buildUtcRange,
   formatDateKey,
+  listUtcDays,
   computeDailyMetrics,
 } = require("../utils/progress");
 const { DEFAULT_SYSTEM_PROMPT, generateAiResponse } = require("../utils/aiClient");
@@ -12,6 +13,25 @@ const { DEFAULT_SYSTEM_PROMPT, generateAiResponse } = require("../utils/aiClient
 const chatHistory = new Map();
 const MAX_HISTORY = 10;
 const MAX_TASKS = 50;
+
+const buildRangeFromInputs = (date, startDate, endDate) => {
+  if (date) {
+    return buildUtcRange(date);
+  }
+
+  if (!startDate || !endDate) {
+    return null;
+  }
+
+  const startRange = buildUtcRange(startDate);
+  const endRange = buildUtcRange(endDate);
+
+  if (!startRange || !endRange || startRange.start > endRange.end) {
+    return null;
+  }
+
+  return { start: startRange.start, end: endRange.end };
+};
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -92,7 +112,7 @@ const buildInsightPrompt = async ({ tasks, context }) => {
   ].join("\n");
 };
 
-const getTasksForInsight = async ({ taskIds, date }) => {
+const getTasksForInsight = async ({ taskIds, date, startDate, endDate }) => {
   if (taskIds && taskIds.length > 0) {
     const idFilters = taskIds.map((id) => String(id));
     const objectIds = idFilters.filter((id) => isValidObjectId(id));
@@ -105,9 +125,14 @@ const getTasksForInsight = async ({ taskIds, date }) => {
     return Task.find(query).lean();
   }
 
-  const range = buildUtcRange(date);
+  const range = buildRangeFromInputs(date, startDate, endDate);
   if (!range) {
     return null;
+  }
+
+  const days = listUtcDays(range.start, range.end);
+  if (days.length > 93) {
+    return false;
   }
 
   return Task.find({ date: { $gte: range.start, $lte: range.end } }).lean();
@@ -115,10 +140,10 @@ const getTasksForInsight = async ({ taskIds, date }) => {
 
 const generateInsights = async (req, res) => {
   try {
-    const { taskIds, date, context } = req.body;
+    const { taskIds, date, startDate, endDate, context } = req.body;
 
-    if ((!taskIds || taskIds.length === 0) && !date) {
-      return res.status(400).json({ message: "taskIds or date is required" });
+    if ((!taskIds || taskIds.length === 0) && !date && !(startDate && endDate)) {
+      return res.status(400).json({ message: "taskIds, date, or date range is required" });
     }
 
     if (taskIds && !Array.isArray(taskIds)) {
@@ -133,9 +158,12 @@ const generateInsights = async (req, res) => {
       return res.status(400).json({ message: "context must be a string" });
     }
 
-    const tasks = await getTasksForInsight({ taskIds, date });
+    const tasks = await getTasksForInsight({ taskIds, date, startDate, endDate });
     if (!tasks) {
       return res.status(400).json({ message: "Invalid date format" });
+    }
+    if (tasks === false) {
+      return res.status(400).json({ message: "Date range too large" });
     }
 
     if (!tasks.length) {
@@ -158,7 +186,15 @@ const generateInsights = async (req, res) => {
 
     const updatedTasks = await Task.find({ _id: { $in: taskIdsToUpdate } });
 
-    return res.status(200).json({ tasks: updatedTasks, generalInsight });
+    return res.status(200).json({
+      tasks: updatedTasks,
+      generalInsight,
+      scope: {
+        date: date || null,
+        startDate: startDate || null,
+        endDate: endDate || null,
+      },
+    });
   } catch (error) {
     console.error("Error generating insights:", error);
     const status = error.response && error.response.status === 429 ? 429 : 503;
@@ -226,7 +262,14 @@ const chatWithAi = async (req, res) => {
   }
 };
 
+const clearChatHistory = async (req, res) => {
+  const key = req.ip || "chat";
+  chatHistory.delete(key);
+  return res.status(200).json({ message: "Chat history cleared" });
+};
+
 module.exports = {
   generateInsights,
   chatWithAi,
+  clearChatHistory,
 };
