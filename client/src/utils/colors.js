@@ -1,19 +1,28 @@
-export const getHeatmapClass = (value) => {
-  if (!value || !value.value) {
-    return "heatmap-empty";
-  }
-
-  if (value.value >= 90) {
-    return "heatmap-peak";
-  }
-  if (value.value >= 70) {
-    return "heatmap-high";
-  }
-  if (value.value >= 40) {
-    return "heatmap-mid";
-  }
-
-  return "heatmap-low";
+export const CATEGORY_COLORS = {
+  overall: "#e07a5f",
+  work: "#3d405b",
+  health: "#2a9d8f",
+  personal: "#f4a261",
+  learning: "#81b29a",
+  other: "#8d6e63",
 };
 
-export const chartPalette = ["#e07a5f", "#2a9d8f", "#f2cc8f", "#81b29a", "#3d405b"];
+export const HEATMAP_LEVELS = ["#edf6f1", "#cfe9da", "#92c9ab", "#4ea978", "#1f7a4f"];
+
+export const getHeatmapColor = (value) => {
+  if (value >= 100) {
+    return HEATMAP_LEVELS[4];
+  }
+  if (value >= 75) {
+    return HEATMAP_LEVELS[3];
+  }
+  if (value >= 50) {
+    return HEATMAP_LEVELS[2];
+  }
+  if (value >= 25) {
+    return HEATMAP_LEVELS[1];
+  }
+  return HEATMAP_LEVELS[0];
+};
+
+export const chartPalette = Object.values(CATEGORY_COLORS);

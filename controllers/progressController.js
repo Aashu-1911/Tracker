@@ -51,6 +51,56 @@ const getWeekStartUtc = (date) => {
   return start;
 };
 
+const buildCategoryTotals = (initialValue = 0) => {
+  const values = {};
+  allowedCategories.forEach((category) => {
+    values[category] = initialValue;
+  });
+  return values;
+};
+
+const buildDailyTaskDetails = (tasks) => {
+  const details = {
+    statusBreakdown: {
+      pending: 0,
+      "in-progress": 0,
+      completed: 0,
+    },
+    tasksPerCategory: buildCategoryTotals(),
+    completedTasksPerCategory: buildCategoryTotals(),
+    timeSpentByCategory: buildCategoryTotals(),
+    totalTimeSpent: 0,
+  };
+
+  tasks.forEach((task) => {
+    const category = allowedCategories.includes(task.category) ? task.category : "other";
+    const status = ["pending", "in-progress", "completed"].includes(task.status)
+      ? task.status
+      : "pending";
+
+    details.statusBreakdown[status] += 1;
+    details.tasksPerCategory[category] += 1;
+
+    if (status === "completed") {
+      details.completedTasksPerCategory[category] += 1;
+    }
+
+    if (typeof task.timeSpent === "number" && Number.isFinite(task.timeSpent)) {
+      details.timeSpentByCategory[category] += task.timeSpent;
+      details.totalTimeSpent += task.timeSpent;
+    }
+  });
+
+  details.completionPercentageByCategory = allowedCategories.reduce((acc, category) => {
+    const total = details.completedTasksPerCategory[category];
+    const dayTotal = details.tasksPerCategory[category];
+    acc[category] = dayTotal ? Math.round((total / dayTotal) * 100) : 0;
+    return acc;
+  }, {});
+
+  return details;
+};
+
 const getTodayProgress = async (req, res) => {
   try {
     const progress = await updateDailyProgressForDate(new Date());
@@ -116,6 +166,7 @@ const getProgressRange = async (req, res) => {
       const dayTasks = tasksByDay.get(key) || [];
       const metrics = computeDailyMetrics(dayTasks);
       const existing = progressByDay.get(key);
+      const details = buildDailyTaskDetails(dayTasks);
 
       totalTasks += metrics.totalTasks;
       totalCompleted += metrics.completedTasks;
@@ -127,6 +178,11 @@ const getProgressRange = async (req, res) => {
         completedTasks: metrics.completedTasks,
         completionPercentage: metrics.completionPercentage,
         tasksPerCategory: metrics.tasksPerCategory,
+        completedTasksPerCategory: details.completedTasksPerCategory,
+        completionPercentageByCategory: details.completionPercentageByCategory,
+        statusBreakdown: details.statusBreakdown,
+        timeSpentByCategory: details.timeSpentByCategory,
+        totalTimeSpent: details.totalTimeSpent,
         averageTimePerTask: metrics.averageTimePerTask,
         mood: existing ? existing.mood : null,
         notes: existing ? existing.notes : "",
@@ -146,6 +202,7 @@ const getProgressRange = async (req, res) => {
         totalTasks,
         totalCompleted,
         averageCompletionPercentage,
+        totalTimeSpent: progressList.reduce((sum, entry) => sum + entry.totalTimeSpent, 0),
       },
       progress: progressList,
     });
@@ -167,6 +224,7 @@ const getProgressStats = async (req, res) => {
       bestDay: null,
       tasksPerCategory: {},
       averageTimePerTask: 0,
+      totalTimeSpent: 0,
       taskCompletionByCategory: {},
     };
 
@@ -228,6 +286,8 @@ const getProgressStats = async (req, res) => {
     if (timeSpentCount > 0) {
       totals.averageTimePerTask = Math.round(timeSpentTotal / timeSpentCount);
     }
+
+    totals.totalTimeSpent = timeSpentTotal;
 
     const today = new Date();
     const todayKey = formatDateKey(today);

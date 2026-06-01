@@ -89,6 +89,12 @@ const createTask = async (req, res) => {
       date: taskDate,
     });
 
+    try {
+      await updateDailyProgressForDate(task.date);
+    } catch (progressError) {
+      console.error("Error updating daily progress:", progressError);
+    }
+
     return res.status(201).json(task);
   } catch (error) {
     console.error("Error creating task:", error);
