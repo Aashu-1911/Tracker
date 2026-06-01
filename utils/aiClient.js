@@ -34,45 +34,9 @@ const requestWithRetry = async (fn, retries = 3) => {
   return null;
 };
 
-const callAnthropic = async ({ systemPrompt, messages }) => {
-  const apiKey = process.env.CLAUDE_API_KEY;
+const callOpenAI = async ({ systemPrompt, messages, apiKey }) => {
   if (!apiKey) {
-    throw new Error("CLAUDE_API_KEY is not set");
-  }
-
-  const model = process.env.CLAUDE_MODEL || "claude-3-sonnet";
-
-  const response = await requestWithRetry(() =>
-    axios.post(
-      "https://api.anthropic.com/v1/messages",
-      {
-        model,
-        max_tokens: 600,
-        system: systemPrompt,
-        messages,
-      },
-      {
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-      }
-    )
-  );
-
-  const content = response.data && response.data.content ? response.data.content : [];
-  if (!Array.isArray(content) || content.length === 0) {
-    return "";
-  }
-
-  return content.map((item) => item.text || "").join("\n").trim();
-};
-
-const callOpenAI = async ({ systemPrompt, messages }) => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not set");
+    throw new Error("OpenAI API key is not set");
   }
 
   const model = process.env.OPENAI_MODEL || "gpt-4";
@@ -99,20 +63,38 @@ const callOpenAI = async ({ systemPrompt, messages }) => {
   return choice && choice.message ? String(choice.message.content || "").trim() : "";
 };
 
+const getOpenAIKeys = () =>
+  [process.env.OPENAI_API_KEY1, process.env.OPENAI_API_KEY2, process.env.OPENAI_API_KEY]
+    .filter(Boolean)
+    .map((key) => key.trim())
+    .filter((key, index, list) => list.indexOf(key) === index);
+
+const shouldFailover = (error) => {
+  const status = error && error.response ? error.response.status : null;
+  return status === 401 || status === 403 || status === 429;
+};
+
 const generateAiResponse = async ({ systemPrompt, messages }) => {
   const prompt = systemPrompt || DEFAULT_SYSTEM_PROMPT;
-  const useClaude = Boolean(process.env.CLAUDE_API_KEY);
-  const useOpenAI = Boolean(process.env.OPENAI_API_KEY);
+  const keys = getOpenAIKeys();
 
-  if (!useClaude && !useOpenAI) {
-    throw new Error("No AI API key configured");
+  if (keys.length === 0) {
+    throw new Error("No OpenAI API key configured");
   }
 
-  if (useClaude) {
-    return callAnthropic({ systemPrompt: prompt, messages });
+  let lastError;
+  for (const apiKey of keys) {
+    try {
+      return await callOpenAI({ systemPrompt: prompt, messages, apiKey });
+    } catch (error) {
+      lastError = error;
+      if (!shouldFailover(error)) {
+        throw error;
+      }
+    }
   }
 
-  return callOpenAI({ systemPrompt: prompt, messages });
+  throw lastError;
 };
 
 module.exports = {
