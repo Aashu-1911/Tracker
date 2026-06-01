@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FiCpu, FiRefreshCcw } from "react-icons/fi";
-import { generateAIInsights } from "../services/api";
+import { generateInsights } from "../services/api";
 
 const TaskInsightBadge = ({ task, onInsightReady }) => {
   const [loading, setLoading] = useState(false);
@@ -15,7 +15,7 @@ const TaskInsightBadge = ({ task, onInsightReady }) => {
     setError("");
 
     try {
-      const response = await generateAIInsights({ taskIds: [task._id] });
+      const response = await generateInsights({ taskIds: [task._id] });
       const updatedTask = response?.tasks?.[0] || task;
       onInsightReady?.(updatedTask, response?.generalInsight || updatedTask.aiInsight || "");
     } catch (err) {

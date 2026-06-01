@@ -23,6 +23,8 @@ const TasksPage = ({ viewMode }) => {
     loadSelectedDay,
     loadProgressMonth,
     setSelectedDate,
+    refreshCore,
+    tasksFromCache,
   } = useAppContext();
 
   const averageComparison = useMemo(() => {
@@ -61,8 +63,15 @@ const TasksPage = ({ viewMode }) => {
       {(tasksLoading || progress.loading) ? (
         <LoadingState label="Updating your workspace..." />
       ) : null}
-      {tasksError ? <ErrorState message={tasksError} /> : null}
-      {progress.error ? <ErrorState message={progress.error} /> : null}
+      {tasksError ? (
+        <ErrorState message={tasksError} onRetry={() => loadTasks({})} />
+      ) : null}
+      {progress.error ? (
+        <ErrorState message={progress.error} onRetry={() => refreshCore()} />
+      ) : null}
+      {tasksFromCache || progress.fromCache ? (
+        <p className="meta">Showing saved data — refresh when you are back online.</p>
+      ) : null}
 
       {viewMode === "calendar" ? (
         <div className="section">

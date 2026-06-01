@@ -13,6 +13,7 @@ const useAppContext = () => {
     notifications: context.state.notifications,
     tasksLoading: context.state.tasksLoading,
     tasksError: context.state.tasksError,
+    tasksFromCache: context.state.tasksFromCache,
   };
 };
 

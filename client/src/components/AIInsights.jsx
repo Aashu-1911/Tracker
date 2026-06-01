@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format, subDays } from "date-fns";
 import { FiZap } from "react-icons/fi";
-import { generateAIInsights } from "../services/api";
+import useAIInsights from "../hooks/useAIInsights";
 import LoadingState from "./LoadingState";
 import ErrorState from "./ErrorState";
 import InsightModal from "./InsightModal";
@@ -26,10 +26,14 @@ const AIInsights = ({ onInsightsApplied }) => {
   const [startDate, setStartDate] = useState(formatInputDate(subDays(new Date(), 6)));
   const [endDate, setEndDate] = useState(formatInputDate(new Date()));
   const [context, setContext] = useState("");
-  const [insight, setInsight] = useState("");
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const {
+    insight,
+    tasks,
+    loading,
+    error,
+    generate,
+    setInsight,
+  } = useAIInsights();
   const [modalOpen, setModalOpen] = useState(false);
 
   const sections = useMemo(() => extractSections(insight), [insight]);
@@ -43,21 +47,10 @@ const AIInsights = ({ onInsightsApplied }) => {
 
   const handleGenerate = async (event) => {
     event?.preventDefault?.();
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await generateAIInsights(buildPayload());
-      setInsight(response?.generalInsight || "");
-      setTasks(response?.tasks || []);
-      onInsightsApplied?.(response?.tasks || []);
+    const response = await generate(buildPayload());
+    if (response) {
+      onInsightsApplied?.(response.tasks || []);
       setModalOpen(true);
-    } catch (err) {
-      setError(err.message || "Unable to generate insights.");
-      setInsight("");
-      setTasks([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -132,7 +125,7 @@ const AIInsights = ({ onInsightsApplied }) => {
         </form>
 
         {loading ? <LoadingState label="Thinking through your progress..." /> : null}
-        {error ? <ErrorState message={error} /> : null}
+        {error ? <ErrorState message={error} onRetry={handleGenerate} /> : null}
 
         {insight ? (
           <div className="ai-insight-preview-grid">

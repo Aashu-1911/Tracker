@@ -4,16 +4,22 @@ import { format, subDays } from "date-fns";
 import {
   chatWithAI,
   clearAIChat,
+  completeTask,
   createTask,
   deleteTask,
-  getHeatmapData,
-  getProgressRange,
-  getStats,
-  getTasks,
-  getTodayProgress,
-  markTaskComplete,
+  fetchHeatmapData,
+  fetchProgressRange,
+  fetchStats,
+  fetchTasks,
+  fetchTodayProgress,
   updateTask,
 } from "../services/api";
+import {
+  loadProgressBackup,
+  loadTasksBackup,
+  saveProgressBackup,
+  saveTasksBackup,
+} from "../utils/storage";
 
 const AppContext = createContext(null);
 
@@ -35,8 +41,10 @@ const initialState = {
     trend: [],
     selectedDay: null,
     selectedMonth: formatApiMonth(new Date()),
+    heatmapLoaded: false,
     loading: false,
     error: "",
+    fromCache: false,
   },
   selectedDate: formatApiDate(new Date()),
   filters: {
@@ -52,6 +60,7 @@ const initialState = {
   notifications: [],
   tasksLoading: false,
   tasksError: "",
+  tasksFromCache: false,
 };
 
 const reducer = (state, action) => {
@@ -59,9 +68,10 @@ const reducer = (state, action) => {
     case "SET_TASKS":
       return {
         ...state,
-        tasks: action.payload || [],
+        tasks: action.payload.tasks || [],
         tasksLoading: false,
         tasksError: "",
+        tasksFromCache: Boolean(action.payload.fromCache),
       };
     case "SET_TASKS_LOADING":
       return {
@@ -164,6 +174,8 @@ const reducer = (state, action) => {
 const fallbackMessage =
   "The AI service is unavailable right now. Keep moving with one small next task and try again shortly.";
 
+const friendlyError = (err, fallback) => err?.message || fallback;
+
 export const AppProvider = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
@@ -181,51 +193,131 @@ export const AppProvider = ({ children }) => {
     (overrides = {}) => {
       const selectedDate = overrides.selectedDate || state.selectedDate;
       const filters = overrides.filters || state.filters;
-      const params = {
-        page: 1,
-        limit: overrides.limit || 20,
-      };
+      return { selectedDate, filters };
+    },
+    [state.filters, state.selectedDate]
+  );
 
-      if (selectedDate && overrides.includeDate !== false) {
-        params.date = selectedDate;
+  const applyTasksResult = useCallback(
+    (tasks, fromCache = false) => {
+      dispatch({ type: "SET_TASKS", payload: { tasks, fromCache } });
+      if (!fromCache && tasks.length >= 0) {
+        saveTasksBackup(tasks, { date: state.selectedDate, filters: state.filters });
       }
-      if (filters.status && filters.status !== "all") {
-        params.status = filters.status;
-      }
-      if (filters.category && filters.category !== "all") {
-        params.category = filters.category;
-      }
-
-      return params;
     },
     [state.filters, state.selectedDate]
   );
 
   const loadTasks = useCallback(
     async (options = {}) => {
+      const { selectedDate, filters } = buildTaskParams(options);
       dispatch({ type: "SET_TASKS_LOADING", payload: true });
       dispatch({ type: "SET_TASKS_ERROR", payload: "" });
 
       try {
-        const response = await getTasks(buildTaskParams(options));
-        let tasks = response?.tasks || [];
-        const activeFilters = options.filters || state.filters;
-
-        if (activeFilters.priority && activeFilters.priority !== "all") {
-          tasks = tasks.filter((task) => task.priority === activeFilters.priority);
-        }
-
-        dispatch({ type: "SET_TASKS", payload: tasks });
+        const response = await fetchTasks(selectedDate, filters);
+        const tasks = response?.tasks || [];
+        applyTasksResult(tasks, false);
         return tasks;
       } catch (err) {
-        const message = err.message || "Failed to load tasks.";
+        const backup = loadTasksBackup();
+        if (backup.length) {
+          applyTasksResult(backup, true);
+          addNotification("Showing saved tasks while the server is unavailable.", "error");
+          return backup;
+        }
+        const message = friendlyError(err, "Failed to load tasks.");
         dispatch({ type: "SET_TASKS_ERROR", payload: message });
         addNotification(message, "error");
         return [];
       }
     },
-    [addNotification, buildTaskParams, state.filters]
+    [addNotification, applyTasksResult, buildTaskParams]
   );
+
+  const loadStats = useCallback(async () => {
+    dispatch({ type: "SET_PROGRESS", payload: { loading: true, error: "" } });
+
+    try {
+      const [todayData, statsData] = await Promise.all([fetchTodayProgress(), fetchStats()]);
+      saveProgressBackup({ today: todayData, stats: statsData });
+      dispatch({
+        type: "SET_PROGRESS",
+        payload: {
+          today: todayData,
+          stats: statsData,
+          loading: false,
+          error: "",
+          fromCache: false,
+        },
+      });
+    } catch (err) {
+      const backup = loadProgressBackup();
+      if (backup?.today || backup?.stats) {
+        dispatch({
+          type: "SET_PROGRESS",
+          payload: {
+            today: backup.today || state.progress.today,
+            stats: backup.stats || state.progress.stats,
+            loading: false,
+            error: "",
+            fromCache: true,
+          },
+        });
+        addNotification("Showing saved stats while the server is unavailable.", "error");
+        return;
+      }
+      const message = friendlyError(err, "Failed to load stats.");
+      dispatch({ type: "SET_PROGRESS", payload: { loading: false, error: message } });
+      addNotification(message, "error");
+    }
+  }, [addNotification, state.progress.today, state.progress.stats]);
+
+  const loadHeatmap = useCallback(
+    async (options = {}) => {
+      const monthDate = options.monthDate
+        ? new Date(options.monthDate)
+        : new Date(`${state.progress.selectedMonth}-01`);
+
+      try {
+        const heatmapData = await fetchHeatmapData(formatApiMonth(monthDate));
+        dispatch({
+          type: "SET_PROGRESS",
+          payload: {
+            heatmap: heatmapData || [],
+            selectedMonth: formatApiMonth(monthDate),
+            heatmapLoaded: true,
+            error: "",
+          },
+        });
+      } catch (err) {
+        const message = friendlyError(err, "Failed to load heatmap.");
+        dispatch({ type: "SET_PROGRESS", payload: { error: message } });
+        addNotification(message, "error");
+      }
+    },
+    [addNotification, state.progress.selectedMonth]
+  );
+
+  const loadTrend = useCallback(async () => {
+    const rangeEnd = new Date();
+    const rangeStart = subDays(rangeEnd, 29);
+
+    try {
+      const trendData = await fetchProgressRange(
+        formatApiDate(rangeStart),
+        formatApiDate(rangeEnd)
+      );
+      dispatch({
+        type: "SET_PROGRESS",
+        payload: { trend: trendData?.progress || [], error: "" },
+      });
+    } catch (err) {
+      const message = friendlyError(err, "Failed to load progress trend.");
+      dispatch({ type: "SET_PROGRESS", payload: { error: message } });
+      addNotification(message, "error");
+    }
+  }, [addNotification]);
 
   const loadProgress = useCallback(
     async (options = {}) => {
@@ -235,28 +327,27 @@ export const AppProvider = ({ children }) => {
       const targetDate = options.selectedDate
         ? new Date(options.selectedDate)
         : new Date(state.selectedDate);
-      const rangeEnd = new Date();
-      const rangeStart = subDays(rangeEnd, 29);
 
-      dispatch({
-        type: "SET_PROGRESS",
-        payload: { loading: true, error: "" },
-      });
+      dispatch({ type: "SET_PROGRESS", payload: { loading: true, error: "" } });
 
       try {
         const [todayData, statsData, heatmapData, trendData, selectedDayData] = await Promise.all([
-          getTodayProgress(),
-          getStats(),
-          getHeatmapData({ month: formatApiMonth(monthDate) }),
-          getProgressRange({
-            startDate: formatApiDate(rangeStart),
-            endDate: formatApiDate(rangeEnd),
-          }),
-          getProgressRange({
-            startDate: formatApiDate(targetDate),
-            endDate: formatApiDate(targetDate),
-          }),
+          fetchTodayProgress(),
+          fetchStats(),
+          fetchHeatmapData(formatApiMonth(monthDate)),
+          fetchProgressRange(
+            formatApiDate(subDays(new Date(), 29)),
+            formatApiDate(new Date())
+          ),
+          fetchProgressRange(formatApiDate(targetDate), formatApiDate(targetDate)),
         ]);
+
+        saveProgressBackup({
+          today: todayData,
+          stats: statsData,
+          heatmap: heatmapData,
+          trend: trendData?.progress,
+        });
 
         dispatch({
           type: "SET_PROGRESS",
@@ -267,62 +358,117 @@ export const AppProvider = ({ children }) => {
             trend: trendData?.progress || [],
             selectedDay: selectedDayData?.progress?.[0] || null,
             selectedMonth: formatApiMonth(monthDate),
+            heatmapLoaded: true,
             loading: false,
             error: "",
+            fromCache: false,
           },
         });
       } catch (err) {
-        const message = err.message || "Failed to load progress.";
-        dispatch({
-          type: "SET_PROGRESS",
-          payload: { loading: false, error: message },
-        });
+        const backup = loadProgressBackup();
+        if (backup) {
+          dispatch({
+            type: "SET_PROGRESS",
+            payload: {
+              today: backup.today ?? state.progress.today,
+              stats: backup.stats ?? state.progress.stats,
+              heatmap: backup.heatmap ?? state.progress.heatmap,
+              trend: backup.trend ?? state.progress.trend,
+              loading: false,
+              fromCache: true,
+              error: "",
+            },
+          });
+          addNotification("Showing saved progress while the server is unavailable.", "error");
+          return;
+        }
+        const message = friendlyError(err, "Failed to load progress.");
+        dispatch({ type: "SET_PROGRESS", payload: { loading: false, error: message } });
         addNotification(message, "error");
       }
     },
-    [addNotification, state.progress.selectedMonth, state.selectedDate]
+    [addNotification, state.progress.heatmap, state.progress.stats, state.progress.today, state.progress.trend, state.progress.selectedMonth, state.selectedDate]
+  );
+
+  const loadInitialData = useCallback(
+    async (options = {}) => {
+      const date = options.selectedDate || state.selectedDate;
+      await Promise.all([loadTasks({ selectedDate: date, filters: options.filters }), loadStats()]);
+    },
+    [loadStats, loadTasks, state.selectedDate]
+  );
+
+  const refreshCore = useCallback(
+    async (options = {}) => {
+      await Promise.all([
+        loadTasks({ selectedDate: options.selectedDate, filters: options.filters }),
+        loadStats(),
+      ]);
+      if (state.progress.heatmapLoaded) {
+        await loadHeatmap({ monthDate: options.monthDate });
+      }
+    },
+    [loadHeatmap, loadStats, loadTasks, state.progress.heatmapLoaded]
   );
 
   const refreshAll = useCallback(
     async (options = {}) => {
-      await Promise.all([
-        loadTasks({ selectedDate: options.selectedDate, filters: options.filters, limit: options.limit }),
-        loadProgress({ selectedDate: options.selectedDate, monthDate: options.monthDate }),
-      ]);
+      await refreshCore(options);
+      if (options.includeTrend) {
+        await loadTrend();
+      }
     },
-    [loadProgress, loadTasks]
+    [loadTrend, refreshCore]
   );
 
   const handleAddTask = useCallback(
     async (payload) => {
-      const task = await createTask(payload);
-      dispatch({ type: "ADD_TASK", payload: task });
-      addNotification("Task added.", "success");
-      await refreshAll({ selectedDate: state.selectedDate });
-      return task;
+      try {
+        const task = await createTask(payload);
+        dispatch({ type: "ADD_TASK", payload: task });
+        addNotification("Task added.", "success");
+        await refreshCore({ selectedDate: state.selectedDate });
+        return task;
+      } catch (err) {
+        const message = friendlyError(err, "Failed to add task.");
+        addNotification(message, "error");
+        throw err;
+      }
     },
-    [addNotification, refreshAll, state.selectedDate]
+    [addNotification, refreshCore, state.selectedDate]
   );
 
   const handleUpdateTask = useCallback(
     async (id, payload) => {
-      const updated = await updateTask(id, payload);
-      dispatch({ type: "UPDATE_TASK", payload: updated });
-      addNotification("Task updated.", "success");
-      await refreshAll({ selectedDate: state.selectedDate });
-      return updated;
+      try {
+        const updated = await updateTask(id, payload);
+        dispatch({ type: "UPDATE_TASK", payload: updated });
+        addNotification("Task updated.", "success");
+        await refreshCore({ selectedDate: state.selectedDate });
+        return updated;
+      } catch (err) {
+        const message = friendlyError(err, "Failed to update task.");
+        addNotification(message, "error");
+        throw err;
+      }
     },
-    [addNotification, refreshAll, state.selectedDate]
+    [addNotification, refreshCore, state.selectedDate]
   );
 
   const handleDeleteTask = useCallback(
     async (id) => {
-      await deleteTask(id);
-      dispatch({ type: "DELETE_TASK", payload: id });
-      addNotification("Task deleted.", "info");
-      await refreshAll({ selectedDate: state.selectedDate });
+      try {
+        await deleteTask(id);
+        dispatch({ type: "DELETE_TASK", payload: id });
+        addNotification("Task deleted.", "info");
+        await refreshCore({ selectedDate: state.selectedDate });
+      } catch (err) {
+        const message = friendlyError(err, "Failed to delete task.");
+        addNotification(message, "error");
+        throw err;
+      }
     },
-    [addNotification, refreshAll, state.selectedDate]
+    [addNotification, refreshCore, state.selectedDate]
   );
 
   const handleToggleComplete = useCallback(
@@ -331,28 +477,34 @@ export const AppProvider = ({ children }) => {
         return null;
       }
 
-      const updated =
-        task.status === "completed"
-          ? await updateTask(task._id, { status: "pending" })
-          : await markTaskComplete(task._id, {});
+      try {
+        const updated =
+          task.status === "completed"
+            ? await updateTask(task._id, { status: "pending" })
+            : await completeTask(task._id, {});
 
-      dispatch({ type: "UPDATE_TASK", payload: updated });
-      addNotification(
-        updated.status === "completed" ? "Task completed." : "Task moved back to pending.",
-        "success"
-      );
-      await refreshAll({ selectedDate: state.selectedDate });
-      return updated;
+        dispatch({ type: "UPDATE_TASK", payload: updated });
+        addNotification(
+          updated.status === "completed" ? "Task completed." : "Task moved back to pending.",
+          "success"
+        );
+        await refreshCore({ selectedDate: state.selectedDate });
+        return updated;
+      } catch (err) {
+        const message = friendlyError(err, "Failed to update task status.");
+        addNotification(message, "error");
+        throw err;
+      }
     },
-    [addNotification, refreshAll, state.selectedDate]
+    [addNotification, refreshCore, state.selectedDate]
   );
 
   const setSelectedDate = useCallback(
     async (dateValue) => {
       dispatch({ type: "SET_SELECTED_DATE", payload: dateValue });
-      await refreshAll({ selectedDate: dateValue });
+      await refreshCore({ selectedDate: dateValue });
     },
-    [refreshAll]
+    [refreshCore]
   );
 
   const setFilters = useCallback(
@@ -371,16 +523,15 @@ export const AppProvider = ({ children }) => {
   const loadSelectedDay = useCallback(
     async (dateValue) => {
       try {
-        const response = await getProgressRange({
-          startDate: formatApiDate(dateValue),
-          endDate: formatApiDate(dateValue),
-        });
-
+        const response = await fetchProgressRange(
+          formatApiDate(dateValue),
+          formatApiDate(dateValue)
+        );
         const selectedDay = response?.progress?.[0] || null;
         dispatch({ type: "SET_PROGRESS", payload: { selectedDay } });
         return selectedDay;
       } catch (err) {
-        const message = err.message || "Failed to load selected day.";
+        const message = friendlyError(err, "Failed to load selected day.");
         dispatch({ type: "SET_PROGRESS", payload: { error: message } });
         addNotification(message, "error");
         return null;
@@ -391,12 +542,23 @@ export const AppProvider = ({ children }) => {
 
   const loadProgressMonth = useCallback(
     async (monthDate) => {
-      await loadProgress({
-        monthDate,
-        selectedDate: state.progress.selectedDay?.date || state.selectedDate,
-      });
+      await loadHeatmap({ monthDate });
     },
-    [loadProgress, state.progress.selectedDay?.date, state.selectedDate]
+    [loadHeatmap]
+  );
+
+  const loadAnalyticsData = useCallback(
+    async (options = {}) => {
+      dispatch({ type: "SET_PROGRESS", payload: { loading: true, error: "" } });
+      await Promise.all([
+        loadHeatmap(options),
+        loadTrend(),
+        loadStats(),
+        loadSelectedDay(options.selectedDate || state.selectedDate),
+      ]);
+      dispatch({ type: "SET_PROGRESS", payload: { loading: false } });
+    },
+    [loadHeatmap, loadSelectedDay, loadStats, loadTrend, state.selectedDate]
   );
 
   const sendAIMessage = useCallback(
@@ -428,7 +590,7 @@ export const AppProvider = ({ children }) => {
         dispatch({ type: "ADD_AI_MESSAGE", payload: assistantEntry });
         return assistantEntry;
       } catch (err) {
-        const messageText = err.message || fallbackMessage;
+        const messageText = friendlyError(err, fallbackMessage);
         dispatch({ type: "SET_AI_ERROR", payload: messageText });
         const fallbackEntry = {
           id: `assistant-fallback-${Date.now()}`,
@@ -452,7 +614,7 @@ export const AppProvider = ({ children }) => {
     try {
       await clearAIChat();
     } catch (err) {
-      const message = err.message || "Unable to clear AI chat history.";
+      const message = friendlyError(err, "Unable to clear AI chat history.");
       dispatch({ type: "SET_AI_ERROR", payload: message });
       addNotification(message, "error");
     }
@@ -467,9 +629,15 @@ export const AppProvider = ({ children }) => {
       deleteTask: handleDeleteTask,
       toggleComplete: handleToggleComplete,
       loadTasks,
+      loadStats,
+      loadHeatmap,
+      loadTrend,
       loadProgress,
+      loadInitialData,
+      loadAnalyticsData,
       loadSelectedDay,
       loadProgressMonth,
+      refreshCore,
       refreshAll,
       setSelectedDate,
       setFilters,
@@ -486,11 +654,17 @@ export const AppProvider = ({ children }) => {
       handleDeleteTask,
       handleToggleComplete,
       handleUpdateTask,
+      loadAnalyticsData,
+      loadHeatmap,
+      loadInitialData,
       loadProgress,
       loadProgressMonth,
       loadSelectedDay,
+      loadStats,
       loadTasks,
+      loadTrend,
       refreshAll,
+      refreshCore,
       removeNotification,
       sendAIMessage,
       setFilters,

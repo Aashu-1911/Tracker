@@ -60,7 +60,7 @@ const taskSchema = new mongoose.Schema(
   }
 );
 
-taskSchema.pre("save", function handleCompletionState(next) {
+taskSchema.pre("save", function handleCompletionState() {
   if (this.status === "completed" && !this.completedAt) {
     this.completedAt = new Date();
   }
@@ -68,8 +68,6 @@ taskSchema.pre("save", function handleCompletionState(next) {
   if (this.status !== "completed") {
     this.completedAt = undefined;
   }
-
-  next();
 });
 
 taskSchema.methods.getCompletionStatus = function getCompletionStatus() {

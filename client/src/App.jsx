@@ -37,7 +37,8 @@ const App = () => {
     notifications,
     setSelectedDate,
     setFilters,
-    refreshAll,
+    loadInitialData,
+    refreshCore,
     removeNotification,
     loadTasks,
   } = useAppContext();
@@ -47,8 +48,8 @@ const App = () => {
       return;
     }
     didInitRef.current = true;
-    refreshAll();
-  }, [refreshAll]);
+    loadInitialData();
+  }, [loadInitialData]);
 
   useEffect(() => {
     const timers = notifications.map((notification) =>
@@ -241,7 +242,7 @@ const App = () => {
               <div className="card sidebar-card">
                 <h3>Quick actions</h3>
                 <div className="quick-action-list">
-                  <button className="ghost-button" type="button" onClick={() => refreshAll()}>
+                  <button className="ghost-button" type="button" onClick={() => refreshCore()}>
                     <FiRefreshCw />
                     Refresh data
                   </button>
