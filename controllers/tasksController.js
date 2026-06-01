@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 const Task = require("../models/Task");
+const { updateDailyProgressForDate } = require("../utils/progress");
 
 const allowedCategories = ["work", "health", "personal", "learning", "other"];
 const allowedPriorities = ["high", "medium", "low"];
@@ -212,6 +213,14 @@ const updateTask = async (req, res) => {
 
     await task.save();
 
+    if (typeof status !== "undefined" || typeof timeSpent !== "undefined") {
+      try {
+        await updateDailyProgressForDate(task.date);
+      } catch (progressError) {
+        console.error("Error updating daily progress:", progressError);
+      }
+    }
+
     return res.status(200).json(task);
   } catch (error) {
     console.error("Error updating task:", error);
@@ -230,6 +239,12 @@ const deleteTask = async (req, res) => {
     const task = await Task.findByIdAndDelete(id);
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
+    }
+
+    try {
+      await updateDailyProgressForDate(task.date);
+    } catch (progressError) {
+      console.error("Error updating daily progress:", progressError);
     }
 
     return res.status(200).json({ message: "Task deleted" });
@@ -284,6 +299,12 @@ const completeTask = async (req, res) => {
     }
 
     await task.save();
+
+    try {
+      await updateDailyProgressForDate(task.date);
+    } catch (progressError) {
+      console.error("Error updating daily progress:", progressError);
+    }
 
     return res.status(200).json(task);
   } catch (error) {

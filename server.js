@@ -5,6 +5,8 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const connectDB = require("./config/mongodb");
 const taskRoutes = require("./routes/tasks");
+const progressRoutes = require("./routes/progress");
+const aiRoutes = require("./routes/ai");
 
 const app = express();
 
@@ -15,6 +17,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Routes
 app.use("/api/tasks", taskRoutes);
+app.use("/api/progress", progressRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Health check
 app.get("/", (req, res) => {
