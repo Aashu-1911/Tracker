@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const connectDB = require("./config/mongodb");
+const taskRoutes = require("./routes/tasks");
 
 const app = express();
 
@@ -12,9 +13,17 @@ app.use(cors());
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Routes
+app.use("/api/tasks", taskRoutes);
+
 // Health check
 app.get("/", (req, res) => {
   res.status(200).json({ status: "ok", message: "Tracker API running" });
+});
+
+// Fallback 404
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
 });
 
 const port = process.env.PORT || 5000;
