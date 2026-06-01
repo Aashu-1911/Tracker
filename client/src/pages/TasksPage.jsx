@@ -1,11 +1,19 @@
 import { useEffect } from "react";
 import useTasks from "../hooks/useTasks";
+import TaskForm from "../components/TaskForm";
 import TaskList from "../components/TaskList";
-import LoadingState from "../components/LoadingState";
-import ErrorState from "../components/ErrorState";
 
 const TasksPage = () => {
-  const { tasks, loading, error, fetchTasks } = useTasks();
+  const {
+    tasks,
+    loading,
+    error,
+    fetchTasks,
+    createTask,
+    updateTask,
+    deleteTask,
+    toggleComplete,
+  } = useTasks();
 
   useEffect(() => {
     fetchTasks({ page: 1, limit: 20 });
@@ -18,10 +26,16 @@ const TasksPage = () => {
         <p className="page-subtitle">Review and manage your workflow.</p>
       </div>
 
-      {loading && <LoadingState label="Loading tasks..." />}
-      {error && <ErrorState message={error} />}
-
-      <TaskList tasks={tasks} />
+      <TaskForm onCreate={createTask} />
+      <TaskList
+        tasks={tasks}
+        loading={loading}
+        error={error}
+        onRefresh={(params) => fetchTasks({ page: 1, limit: 20, ...params })}
+        onUpdate={updateTask}
+        onDelete={deleteTask}
+        onToggleComplete={toggleComplete}
+      />
     </div>
   );
 };

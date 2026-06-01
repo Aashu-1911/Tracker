@@ -1,0 +1,79 @@
+.toolbar {
+  display: grid;
+  gap: 20px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filters {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  box-shadow: var(--shadow);
+}
+
+.filterGroup {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.filterGroup select,
+.filterGroup input {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  font-family: inherit;
+}
+
+.sortSelect {
+  max-width: 220px;
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+}
+
+.empty {
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  color: var(--muted);
+}
+
+.error {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(197, 80, 59, 0.12);
+  color: #7a2a1b;
+  font-size: 13px;
+}
+
+.skeleton {
+  height: 64px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, #f1e9df 0%, #f6f1ea 50%, #f1e9df 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
