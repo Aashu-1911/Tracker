@@ -2,10 +2,12 @@ const mongoose = require("mongoose");
 
 const taskSchema = new mongoose.Schema(
   {
-    sessionId: {
+    taskId: {
       type: String,
       required: true,
+      unique: true,
       index: true,
+      trim: true,
     },
     title: {
       type: String,
@@ -17,18 +19,74 @@ const taskSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    date: {
+      type: Date,
+      default: () => new Date(),
+      index: true,
+    },
+    category: {
+      type: String,
+      enum: ["work", "health", "personal", "learning", "other"],
+      default: "other",
+      index: true,
+    },
+    priority: {
+      type: String,
+      enum: ["high", "medium", "low"],
+      default: "medium",
+      index: true,
+    },
     status: {
       type: String,
-      enum: ["todo", "in-progress", "done"],
-      default: "todo",
+      enum: ["pending", "in-progress", "completed"],
+      default: "pending",
+      index: true,
     },
-    dueDate: {
+    completedAt: {
       type: Date,
+    },
+    timeSpent: {
+      type: Number,
+      min: 0,
+    },
+    aiInsight: {
+      type: String,
+      default: "",
+      trim: true,
     },
   },
   {
     timestamps: true,
   }
 );
+
+taskSchema.pre("save", function handleCompletionState(next) {
+  if (this.status === "completed" && !this.completedAt) {
+    this.completedAt = new Date();
+  }
+
+  if (this.status !== "completed") {
+    this.completedAt = undefined;
+  }
+
+  next();
+});
+
+taskSchema.methods.getCompletionStatus = function getCompletionStatus() {
+  return {
+    status: this.status,
+    completedAt: this.completedAt || null,
+  };
+};
+
+taskSchema.statics.getTasksByDate = function getTasksByDate(date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+
+  return this.find({ date: { $gte: start, $lte: end } });
+};
 
 module.exports = mongoose.model("Task", taskSchema);
