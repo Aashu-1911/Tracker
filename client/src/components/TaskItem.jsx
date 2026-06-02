@@ -26,13 +26,14 @@ const getFormStateFromTask = (task) => ({
   aiInsight: task.aiInsight || "",
 });
 
-const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete }) => {
+const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete, isSelected = false, onSelectToggle = null }) => {
   const [editing, setEditing] = useState(false);
   const [formState, setFormState] = useState(() => getFormStateFromTask(task));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [localInsight, setLocalInsight] = useState(task.aiInsight || "");
   const [insightModalOpen, setInsightModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const category = task.category || "other";
   const status = task.status || "pending";
@@ -69,9 +70,14 @@ const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete }) => {
       return;
     }
 
+    setIsDeleting(true);
+    // Wait for the exit animation to finish
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
     try {
       await onDelete(task._id);
     } catch (err) {
+      setIsDeleting(false);
       setError(err.message || "Unable to delete task.");
     }
   };
@@ -105,8 +111,19 @@ const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete }) => {
   };
 
   return (
-    <article className={styles.card}>
+    <article className={`${styles.card} ${isDeleting ? styles.isDeleting : ""}`}>
       <div className={styles.header}>
+        {onSelectToggle ? (
+          <div className={styles.checkboxCol}>
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onSelectToggle}
+              className={styles.bulkCheckbox}
+              aria-label={`Select task: ${task.title}`}
+            />
+          </div>
+        ) : null}
         <div>
           <div className={styles.titleRow}>
             <h4>{task.title}</h4>
@@ -212,6 +229,7 @@ const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete }) => {
                 className={styles.ghost}
                 type="button"
                 onClick={handleToggleStatus}
+                aria-label={status === "completed" ? "Mark pending" : "Mark completed"}
               >
                 <FiCheckCircle />
                 {status === "completed" ? "Mark pending" : "Complete"}
@@ -220,11 +238,17 @@ const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete }) => {
                 className={styles.ghost}
                 type="button"
                 onClick={handleStartEditing}
+                aria-label="Edit task details"
               >
                 <FiEdit3 />
                 Edit
               </button>
-              <button className={styles.ghost} type="button" onClick={handleDelete}>
+              <button
+                className={styles.ghost}
+                type="button"
+                onClick={handleDelete}
+                aria-label="Delete task"
+              >
                 <FiTrash2 />
                 Delete
               </button>
@@ -233,6 +257,7 @@ const TaskItem = ({ task, onUpdate, onDelete, onToggleComplete }) => {
                   className={styles.ghost}
                   type="button"
                   onClick={() => setInsightModalOpen(true)}
+                  aria-label="View task AI insight"
                 >
                   View insight
                 </button>

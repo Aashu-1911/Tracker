@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import TaskItem from "./TaskItem";
 import styles from "./TaskList.module.css";
 import { formatISODate, shiftDateBy } from "../utils/dateUtils";
+import useAppContext from "../hooks/useAppContext";
 
 const statusOptions = ["all", "pending", "in-progress", "completed"];
 const categoryOptions = ["all", "work", "health", "personal", "learning", "other"];
@@ -25,12 +26,40 @@ const TaskList = ({
   subtitle = "Filter by what matters most right now.",
   emptyMessage = "No tasks match these filters yet.",
 }) => {
+  const { bulkComplete, bulkDelete } = useAppContext();
   const [dateFilter, setDateFilter] = useState("today");
   const [customDate, setCustomDate] = useState(formatISODate(new Date()));
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date");
+  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+
+  const handleSelectToggle = (id) => {
+    setSelectedTaskIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedTaskIds.length === filteredTasks.length) {
+      setSelectedTaskIds([]);
+    } else {
+      setSelectedTaskIds(filteredTasks.map((t) => t._id || t.taskId));
+    }
+  };
+
+  const handleBulkComplete = async () => {
+    if (selectedTaskIds.length === 0) return;
+    await bulkComplete(selectedTaskIds);
+    setSelectedTaskIds([]);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTaskIds.length === 0) return;
+    await bulkDelete(selectedTaskIds);
+    setSelectedTaskIds([]);
+  };
 
   const filterDate = useMemo(() => {
     if (dateFilter === "today") {
@@ -222,17 +251,57 @@ const TaskList = ({
       ) : error ? null : filteredTasks.length === 0 ? (
         <div className={styles.empty}>{emptyMessage}</div>
       ) : (
-        <div className={styles.list}>
-          {filteredTasks.map((task) => (
-            <TaskItem
-              key={task._id || task.taskId}
-              task={task}
-              onToggleComplete={onToggleComplete}
-              onDelete={onDelete}
-              onUpdate={onUpdate}
-            />
-          ))}
-        </div>
+        <>
+          <div className={styles.list}>
+            {filteredTasks.map((task) => (
+              <TaskItem
+                key={task._id || task.taskId}
+                task={task}
+                onToggleComplete={onToggleComplete}
+                onDelete={onDelete}
+                onUpdate={onUpdate}
+                isSelected={selectedTaskIds.includes(task._id || task.taskId)}
+                onSelectToggle={() => handleSelectToggle(task._id || task.taskId)}
+              />
+            ))}
+          </div>
+
+          {selectedTaskIds.length > 0 ? (
+            <div className="bulk-actions-bar animate-slide-up">
+              <span>{selectedTaskIds.length} tasks selected</span>
+              <div className="bulk-actions-buttons">
+                <button 
+                  className="button" 
+                  type="button" 
+                  onClick={handleBulkComplete}
+                >
+                  Complete
+                </button>
+                <button 
+                  className="button error" 
+                  type="button" 
+                  onClick={handleBulkDelete}
+                >
+                  Delete
+                </button>
+                <button 
+                  className="ghost-button" 
+                  type="button" 
+                  onClick={handleToggleSelectAll}
+                >
+                  {selectedTaskIds.length === filteredTasks.length ? "Deselect All" : "Select All"}
+                </button>
+                <button 
+                  className="ghost-button" 
+                  type="button" 
+                  onClick={() => setSelectedTaskIds([])}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
       )}
     </div>
   );

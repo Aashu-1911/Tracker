@@ -6,6 +6,43 @@
   display: grid;
   gap: 14px;
   box-shadow: var(--shadow);
+  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.isDeleting {
+  opacity: 0;
+  transform: scale(0.95) translateY(-10px);
+  max-height: 0;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  overflow: hidden;
+}
+
+.checkboxCol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 8px;
+}
+
+.bulkCheckbox {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  accent-color: var(--accent-cool);
+  transition: transform 0.2s ease;
+}
+
+.bulkCheckbox:hover {
+  transform: scale(1.1);
+}
+
+:global(.dark) .description {
+  color: #e4dbd0;
 }
 
 .header {
