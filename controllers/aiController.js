@@ -197,9 +197,13 @@ const generateInsights = async (req, res) => {
     });
   } catch (error) {
     console.error("Error generating insights:", error);
-    const status = error.response && error.response.status === 429 ? 429 : 503;
+    const status = error.response?.status === 429 ? 429 : 503;
+    const detail =
+      error.message === "No AI API key configured"
+        ? "AI is not configured. Add GEMINI_API_KEY or OPENAI_API_KEY to .env."
+        : error.response?.data?.error?.message || error.message;
     return res.status(status).json({
-      message: "AI service unavailable. Please try again later.",
+      message: detail || "AI service unavailable. Please try again later.",
     });
   }
 };
@@ -224,7 +228,9 @@ const chatWithAi = async (req, res) => {
     }
 
     const key = req.ip || "chat";
-    const history = appendHistory(key, "user", message);
+    appendHistory(key, "user", message);
+
+    const history = chatHistory.get(key) || [];
 
     const contextLines = Array.isArray(context)
       ? context
@@ -247,7 +253,10 @@ const chatWithAi = async (req, res) => {
 
     const response = await generateAiResponse({
       systemPrompt: DEFAULT_SYSTEM_PROMPT,
-      messages: [...history, { role: "user", content: prompt }],
+      messages: [
+        ...history.slice(0, -1),
+        { role: "user", content: prompt },
+      ],
     });
 
     appendHistory(key, "assistant", response);
@@ -255,9 +264,13 @@ const chatWithAi = async (req, res) => {
     return res.status(200).json({ response });
   } catch (error) {
     console.error("Error in AI chat:", error);
-    const status = error.response && error.response.status === 429 ? 429 : 503;
+    const status = error.response?.status === 429 ? 429 : 503;
+    const detail =
+      error.message === "No AI API key configured"
+        ? "AI is not configured. Add GEMINI_API_KEY or OPENAI_API_KEY to .env."
+        : error.response?.data?.error?.message || error.message;
     return res.status(status).json({
-      message: "AI service unavailable. Please try again later.",
+      message: detail || "AI service unavailable. Please try again later.",
     });
   }
 };

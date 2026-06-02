@@ -32,8 +32,17 @@ app.use((req, res) => {
 
 const port = process.env.PORT || 5000;
 
+const { getAiStatus } = require("./utils/aiClient");
+
 connectDB()
   .then(() => {
+    const aiStatus = getAiStatus();
+    if (aiStatus.configured) {
+      console.log(`AI ready (${aiStatus.providers.join(", ")})`);
+    } else {
+      console.warn("AI not configured — set GEMINI_API_KEY or OPENAI_API_KEY in .env");
+    }
+
     app.listen(port, () => {
       console.log(`Server running on port ${port}`);
     });
