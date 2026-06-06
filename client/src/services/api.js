@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://takeyouforward-6se6.onrender.com/";
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 500;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);

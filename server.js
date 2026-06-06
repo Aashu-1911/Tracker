@@ -37,10 +37,13 @@ const { getAiStatus } = require("./utils/aiClient");
 connectDB()
   .then(() => {
     const aiStatus = getAiStatus();
+
     if (aiStatus.configured) {
       console.log(`AI ready (${aiStatus.providers.join(", ")})`);
     } else {
-      console.warn("AI not configured — set GEMINI_API_KEY or OPENAI_API_KEY in .env");
+      console.warn(
+        "AI not configured — set GEMINI_API_KEY or OPENAI_API_KEY"
+      );
     }
 
     app.listen(port, () => {
@@ -48,6 +51,6 @@ connectDB()
     });
   })
   .catch((error) => {
-    console.error("Failed to start server due to DB connection error:", error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   });
